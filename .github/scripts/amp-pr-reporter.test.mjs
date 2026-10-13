@@ -41,7 +41,7 @@ function fixture(kind = "review") {
       repository: { full_name: "vincentbility/amp-qa-lab" },
       pull_requests: [{ number: 1520 }],
       display_title: "Amp review receipt PR 1520 comment 69",
-      actor: { login: "author" },
+      actor: { id: 101, login: "author" },
       created_at: "2026-10-13T05:19:58Z",
     },
     comments: [],
@@ -401,7 +401,7 @@ test("untrusted relay metadata cannot authorize a wrong PR, author or old source
       f.state.relay.display_title = "Amp review receipt PR 1520 comment $(id)";
     },
     (f) => {
-      f.state.relay.actor.login = "someone-else";
+      f.state.relay.actor.id = 202;
     },
     (f) => {
       f.state.relay.created_at = "2026-10-13T05:24:56Z";
@@ -418,6 +418,7 @@ test("untrusted relay metadata cannot authorize a wrong PR, author or old source
   }
   const boundary = fixture();
   boundary.state.relay.created_at = "2026-10-13T05:24:55Z";
+  boundary.state.relay.actor.login = "renamed-author";
   await reportMention(boundary);
   assert.equal(boundary.state.reactions.length, 1);
   assert.equal(boundary.state.comments.length, 1);

@@ -120,7 +120,7 @@ export async function reportMention({ github, context }) {
   if (relayed) {
     const age = Date.parse(relay.created_at) - Date.parse(source.created_at);
     if (
-      relay.actor.login !== source.user.login ||
+      relay.actor.id !== source.user.id ||
       !Number.isFinite(age) ||
       age < 0 ||
       age > 5 * 60 * 1000
