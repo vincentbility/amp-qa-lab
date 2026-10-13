@@ -58,7 +58,8 @@ export async function reportMention({ github, context }) {
     throw new Error("Invalid source kind");
   const operation = dispatched ? input.operation : "receipt";
   if (
-    (dispatched && !["answer", "qa-report"].includes(operation)) ||
+    (dispatched &&
+      !["answer", "qa-report", "routing-blocked"].includes(operation)) ||
     (kind === "opened" && operation !== "qa-report")
   ) {
     throw new Error("Invalid operation");
@@ -154,13 +155,30 @@ export async function reportMention({ github, context }) {
     pr_number: number,
     source_url: source.html_url,
     source_updated_at: source.updated_at,
+    source_author: {
+      github_id: source.user.id,
+      github_login: source.user.login,
+    },
     ...(relayed ? { relay_run_id: relay.id } : {}),
   };
+  // A shared subscriber must not publish its owner's Puck answer for another user.
+  // GitHub authenticates sender; client_payload cannot nominate an identity.
+  if (
+    operation === "answer" &&
+    (context.payload.sender?.type !== "User" ||
+      !Number.isSafeInteger(context.payload.sender.id) ||
+      context.payload.sender.id !== source.user.id)
+  ) {
+    return {
+      ...sourceRecord,
+      blocked: "answer requires source-author authentication",
+    };
+  }
   const runId =
     kind === "opened"
       ? `pr-${number}-opened`
       : `pr-${number}-${kind === "issue" ? "comment" : "review-comment"}-${id}`;
-  const marker = `<!-- ${operation === "receipt" ? "amp-receipt" : operation === "answer" ? "amp-puck" : "amp-qa"}:${operation === "qa-report" ? runId : key} -->`;
+  const marker = `<!-- ${{ receipt: "amp-receipt", answer: "amp-puck", "qa-report": "amp-qa", "routing-blocked": "amp-routing" }[operation]}:${operation === "qa-report" ? runId : key} -->`;
   const comments = await github.paginate(
     kind !== "review"
       ? github.rest.issues.listComments
@@ -194,11 +212,15 @@ export async function reportMention({ github, context }) {
   if (existing && operation !== "qa-report") {
     return { ...sourceRecord, duplicate: true, comment_url: existing.html_url };
   }
+  const message =
+    operation === "routing-blocked"
+      ? "ROUTING_BLOCKED：目前無法驗證或取得留言者本人的 Puck 路由。未轉送到他人的 Puck，也未啟動 QA。需要由留言者本人授權的 Amp 執行身分與個人 Puck 設定才能處理此問題。"
+      : input.body;
   const body =
     operation === "receipt"
       ? `${marker}\n👀 已收到[這則留言](${source.html_url})，等待 Amp 分流；這不代表已啟動 QA。\n\n[可信 reporter run](https://github.com/${owner}/${repo}/actions/runs/${context.runId})`
-      : `${marker}\n回覆[${kind === "opened" ? "此 PR" : "這則留言"}](${source.html_url})：\n\n${input.body}`;
-  if (dispatched && (typeof input.body !== "string" || !input.body.trim())) {
+      : `${marker}\n回覆[${kind === "opened" ? "此 PR" : "這則留言"}](${source.html_url})：\n\n${message}`;
+  if (dispatched && (typeof message !== "string" || !message.trim())) {
     throw new Error("Answer/report body is required");
   }
   let result;

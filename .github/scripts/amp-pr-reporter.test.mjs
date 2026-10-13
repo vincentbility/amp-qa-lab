@@ -9,7 +9,7 @@ function fixture(kind = "review") {
   const source = {
     id: 69,
     body: "  @amp 請處理這個 comment",
-    user: { type: "User", login: "author" },
+    user: { type: "User", id: 101, login: "author" },
     created_at: "2026-10-13T05:19:55Z",
     updated_at: "2026-10-13T05:19:55Z",
     html_url: `https://github.com/vincentbility/amp-qa-lab/pull/1520#${kind}-69`,
@@ -126,6 +126,7 @@ function fixture(kind = "review") {
     payload: {
       action: kind === "review" ? "completed" : "created",
       comment: { id: 69 },
+      sender: { type: "User", id: 101, login: "author" },
       repository: { default_branch: "main" },
       ...(kind === "review"
         ? { workflow_run: { id: 8001 } }
@@ -143,6 +144,10 @@ for (const kind of ["issue", "review"]) {
     assert.equal(result.operation, "receipt");
     assert.equal(result.pr_number, 1520);
     assert.equal(result.source_url, f.state.source.html_url);
+    assert.deepEqual(result.source_author, {
+      github_id: 101,
+      github_login: "author",
+    });
     assert.equal(result.relay_run_id, kind === "review" ? 8001 : undefined);
     assert.deepEqual(
       f.state.reactions.map(({ kind, comment_id, content }) => ({
@@ -203,6 +208,77 @@ for (const kind of ["issue", "review"]) {
     assert.equal(human.body, `<!-- amp-qa:${run} -->\nHuman text`);
     assert.match(f.state.comments[2].body, /PASS — STALE/);
     assert.equal(f.state.comments[2].user.login, "github-actions[bot]");
+  });
+
+  test(`${kind}: personal answers bind to authenticated source-author ID, not payload or login`, async () => {
+    for (const sender of [
+      { type: "User", id: 202, login: "author" },
+      { type: "Bot", id: 101, login: "author" },
+      { type: "User", login: "author" },
+      undefined,
+    ]) {
+      const f = fixture(kind);
+      f.context.eventName = "repository_dispatch";
+      f.context.payload.action = "amp-pr-report";
+      f.context.payload.sender = sender;
+      f.context.payload.client_payload = {
+        operation: "answer",
+        source_kind: kind,
+        pr_number: 1520,
+        comment_id: 69,
+        body: "Wrong owner's Puck answer",
+        sender: f.state.source.user,
+        source_author: { github_id: 101, github_login: "author" },
+      };
+      assert.ok((await reportMention(f)).blocked);
+      assert.equal(f.state.comments.length, 0);
+      assert.equal(f.state.reactions.length, 0);
+      // Shared QA reporting does not require the source author's personal Puck.
+      f.context.payload.client_payload.operation = "qa-report";
+      f.context.payload.client_payload.body = "BLOCKED";
+      await reportMention(f);
+      assert.equal(f.state.comments.length, 1);
+      assert.match(f.state.comments[0].body, /amp-qa:/);
+    }
+    const renamed = fixture(kind);
+    renamed.context.eventName = "repository_dispatch";
+    renamed.context.payload.action = "amp-pr-report";
+    renamed.context.payload.sender.login = "renamed-author";
+    renamed.context.payload.client_payload = {
+      operation: "answer",
+      source_kind: kind,
+      pr_number: 1520,
+      comment_id: 69,
+      body: "Same author's Puck answer",
+    };
+    await reportMention(renamed);
+    assert.match(renamed.state.comments[0].body, /Same author's Puck answer/);
+  });
+
+  test(`${kind}: unavailable personal routing is disclosed once without a Puck or QA claim`, async () => {
+    const f = fixture(kind);
+    f.context.eventName = "repository_dispatch";
+    f.context.payload.action = "amp-pr-report";
+    f.context.payload.sender.id = 202;
+    f.context.payload.client_payload = {
+      operation: "routing-blocked",
+      source_kind: kind,
+      pr_number: 1520,
+      comment_id: 69,
+      body: "Private Puck history must not be published",
+    };
+    await reportMention(f);
+    await reportMention(f);
+    assert.equal(f.state.comments.length, 1);
+    assert.equal(f.state.reactions.length, 0);
+    assert.match(f.state.comments[0].body, /amp-routing:/);
+    assert.match(f.state.comments[0].body, /ROUTING_BLOCKED/);
+    assert.match(f.state.comments[0].body, /未轉送到他人的 Puck，也未啟動 QA/);
+    assert.doesNotMatch(f.state.comments[0].body, /Private Puck history/);
+    assert.equal(
+      f.state.comments[0].in_reply_to_id,
+      kind === "review" ? 14 : undefined,
+    );
   });
 }
 
