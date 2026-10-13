@@ -1,0 +1,17 @@
+name: Amp Review Comment Relay
+run-name: Amp review receipt PR ${{ github.event.pull_request.number }} comment ${{ github.event.comment.id }}
+
+on:
+  pull_request_review_comment:
+    types: [created]
+
+# This event can use PR-controlled YAML. Never put reporter credentials or code here.
+permissions: {}
+
+jobs:
+  source:
+    if: contains(github.event.comment.body, '@amp')
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: echo 'Source identifiers are untrusted run metadata; the default-branch receiver revalidates them.'
