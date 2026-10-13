@@ -17,9 +17,11 @@ configuration, credentials, private Puck identifiers or upstream Git history.
 4. Create the `amp-qa-pilot` label and a label-filtered PR-opening spawner targeting
    that exact project before opening a labeled test PR. Keep other repositories
    and the upstream project's settings unchanged.
-5. Privately configure and verify the owner's real Puck route as described in
-   [AGENTS.md](AGENTS.md). Any manual initialization is recorded separately and
-   does not prove unattended opening QA.
+5. Each execution user selects their own real Puck with personal-scope
+   `AMP_GITHUB_PUCK_THREAD_ID`, as described in [AGENTS.md](AGENTS.md). No shared
+   route file or project Pre-setup Script is needed. Questions from a different
+   or unverifiable author remain ROUTING_BLOCKED, never go to the subscriber's
+   Puck. Automatic execution as other authors has not been established.
 
 ## Local validation
 
@@ -36,6 +38,12 @@ a no-mention control. Require real native delivery or a verified bot receipt,
 one source reaction, actual correlated Puck replies and correctly placed
 `github-actions[bot]` answers. Direct/receipt duplicates share one source key.
 Never manually forward a missing event and count it as automatic delivery.
+
+Verify a missing personal route discloses ROUTING_BLOCKED with zero Puck/QA
+calls, then configure the execution user's own route and test fresh matching-
+author issue/review questions. Numeric author/dispatcher mismatch, spoofed
+payload identities and absent/bot senders must reject personal answers. Mock
+cross-user tests are not multi-user native delivery proof.
 
 The review relay uses PR-controlled workflow YAML without checkout; the
 privileged receiver and report dispatch use default-branch definitions and code.
