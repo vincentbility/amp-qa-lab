@@ -45,3 +45,5 @@ reporter tests; it does not validate any application's behavior or reset service
 
 Record each layer's status separately. Unit tests, a successful relay, an orb
 summary or manually posting with the owner's account are not end-to-end PASS.
+
+This Markdown-only smoke PR exercises the bounded lab contract, not product QA.
