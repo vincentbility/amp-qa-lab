@@ -90,11 +90,16 @@ export async function reportMention({ github, context }) {
   if (!pr.labels.some((label) => label.name === "amp-qa-pilot")) {
     return { ignored: "not enrolled in pilot" };
   }
-  const sourceApi = kind === "review" ? github.rest.pulls : github.rest.issues;
   const source =
     kind === "opened"
       ? pr
-      : (await sourceApi.getComment({ owner, repo, comment_id: id })).data;
+      : (
+          await (
+            kind === "review"
+              ? github.rest.pulls.getReviewComment
+              : github.rest.issues.getComment
+          )({ owner, repo, comment_id: id })
+        ).data;
   const expectedUrl = `https://api.github.com/repos/${owner}/${repo}/${kind === "issue" ? "issues" : "pulls"}/${number}`;
   if (
     kind !== "opened" &&
@@ -133,7 +138,7 @@ export async function reportMention({ github, context }) {
   }
   let root = source;
   if (kind === "review" && source.in_reply_to_id) {
-    ({ data: root } = await github.rest.pulls.getComment({
+    ({ data: root } = await github.rest.pulls.getReviewComment({
       owner,
       repo,
       comment_id: source.in_reply_to_id,
@@ -198,7 +203,11 @@ export async function reportMention({ github, context }) {
   }
   let result;
   if (existing) {
-    result = await sourceApi.updateComment({
+    result = await (
+      kind === "review"
+        ? github.rest.pulls.updateReviewComment
+        : github.rest.issues.updateComment
+    )({
       owner,
       repo,
       comment_id: existing.id,

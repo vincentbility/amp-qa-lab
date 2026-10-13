@@ -91,13 +91,13 @@ function fixture(kind = "review") {
       },
       pulls: {
         get: async () => ({ data: state.pr }),
-        getComment: async ({ comment_id }) => ({
+        getReviewComment: async ({ comment_id }) => ({
           data: comment_id === 69 ? source : root,
         }),
         listReviewComments: () =>
           state.comments.filter((c) => c.destination === "review"),
         createReplyForReviewComment: create("review"),
-        updateComment: update("review"),
+        updateReviewComment: update("review"),
       },
       issues: {
         getComment: async () => ({ data: source }),
